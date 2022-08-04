@@ -1,38 +1,44 @@
 pipeline {
     agent any
-    tools {
-  maven 'M2_HOME'
-}
-    triggers {
-  pollSCM('* * * * *')
-}
-    
+    tools{
+        maven 'M2_HOME'
+    }
+    environment {
+    registry = '560585467749.dkr.ecr.us-east-1.amazonaws.com/devop_repository'
+    registryCredential = 'jenkins-ecr'
+    dockerimage = ''
+  }
     stages {
-        stage('maven package') {
-            steps {
-                sh 'mvn clean'
-                sh 'mvn install'
-                sh 'mvn package'
-                
+        stage('Checkout'){
+            steps{
+                git branch: 'main', url: 'https://github.com/gozkay01/geolocation.git'
             }
         }
-         stage('Test') {
+        stage('Code Build') {
             steps {
-                echo 'Test'
-                
+                sh 'mvn clean package'
             }
         }
-         stage('Deploy') {
+        stage('Test') {
             steps {
-                echo 'Deploy Step'
-                
+                sh 'mvn test'
             }
         }
-         stage('Docker') {
+        stage('Build Image') {
             steps {
-                echo 'Image step'
-                
+                script{
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                } 
             }
         }
+        stage('Deploy image') {
+            steps{
+                script{ 
+                    docker.withRegistry("https://"+registry,"ecr:us-east-1:"+registryCredential) {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }  
     }
 }
